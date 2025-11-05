@@ -1,0 +1,118 @@
+[
+    {
+        "id": "e8c11105c9887d96",
+        "type": "tab",
+        "label": "Seat Occupancy Simulation",
+        "disabled": false,
+        "info": "Simulates a smart train seat detecting occupancy based on weight and temperature."
+    },
+    {
+        "id": "070a2d644a5cc9c0",
+        "type": "inject",
+        "z": "e8c11105c9887d96",
+        "name": "Simulate readings",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "5",
+        "once": true,
+        "onceDelay": "1",
+        "topic": "",
+        "payload": "{\"weight\": 35, \"temperature\": 28}",
+        "payloadType": "json",
+        "x": 180,
+        "y": 120,
+        "wires": [
+            [
+                "9a5b2d5d42bbccb5"
+            ]
+        ]
+    },
+    {
+        "id": "9a5b2d5d42bbccb5",
+        "type": "function",
+        "z": "e8c11105c9887d96",
+        "name": "Determine seat status",
+        "func": "// Thresholds\nconst WEIGHT_THRESHOLD = 30; // kg\nconst TEMP_THRESHOLD = 25; // °C\n\nconst { weight, temperature } = msg.payload;\n\nlet occupied = false;\nlet reason = [];\n\nif (weight > WEIGHT_THRESHOLD) {\n    occupied = true;\n    reason.push(\"Weight threshold exceeded\");\n}\n\nif (temperature > TEMP_THRESHOLD) {\n    occupied = true;\n    reason.push(\"Temperature above ambient\");\n}\n\nmsg.payload = {\n    seatId: 1,\n    timestamp: new Date().toISOString(),\n    weight,\n    temperature,\n    occupied,\n    reason: occupied ? reason.join(\", \") : \"Seat empty\"\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 120,
+        "wires": [
+            [
+                "876243c069cf241e",
+                "22eaba49d967fce5"
+            ]
+        ]
+    },
+    {
+        "id": "876243c069cf241e",
+        "type": "debug",
+        "z": "e8c11105c9887d96",
+        "name": "Debug Output",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 690,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "d70a7bb7e217d19d",
+        "type": "http in",
+        "z": "e8c11105c9887d96",
+        "name": "Seat API (GET)",
+        "url": "/api/seat",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 160,
+        "y": 200,
+        "wires": [
+            [
+                "889d1c7b68d4c462"
+            ]
+        ]
+    },
+    {
+        "id": "889d1c7b68d4c462",
+        "type": "function",
+        "z": "e8c11105c9887d96",
+        "name": "Simulate random input",
+        "func": "// Pick a random seat state\nconst states = [\"empty\", \"object\", \"person\"];\nconst state = states[Math.floor(Math.random() * states.length)];\n\nlet weight, temperature;\n\nswitch (state) {\n  case \"empty\":\n    weight = Math.random() * 3;\n    temperature = 22 + Math.random() * 2;\n    break;\n  case \"object\":\n    weight = 5 + Math.random() * 25;\n    temperature = 23 + Math.random() * 2;\n    break;\n  case \"person\":\n    weight = 40 + Math.random() * 40;\n    temperature = 27 + Math.random() * 5;\n    break;\n}\n\nmsg.payload = { weight, temperature };\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 410,
+        "y": 200,
+        "wires": [
+            [
+                "9a5b2d5d42bbccb5"
+            ]
+        ]
+    },
+    {
+        "id": "22eaba49d967fce5",
+        "type": "http response",
+        "z": "e8c11105c9887d96",
+        "name": "Send JSON response",
+        "statusCode": "",
+        "headers": {
+            "Content-Type": "application/json"
+        },
+        "x": 690,
+        "y": 200,
+        "wires": []
+    }
+]
