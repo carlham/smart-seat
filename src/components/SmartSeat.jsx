@@ -29,7 +29,7 @@ export default function SeatStatus() {
         // person: weight ~40-80, temp ~27-32
         let state = "unknown";
         if (weight <= 3) state = "empty";
-        else if (weight >= 40) state = "person";
+        else if (weight >= 25) state = "person";
         else if (weight >= 5) state = "object";
 
         // temperature can strengthen a person hypothesis
@@ -53,6 +53,7 @@ export default function SeatStatus() {
       const timestamp = data.timestamp ?? payload.timestamp ?? new Date().toISOString();
 
       setSeatData({ ...payload, weight, temperature, color, status, seatId, timestamp });
+      console.log("Fetched seat data:", payload);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -121,8 +122,19 @@ export default function SeatStatus() {
 
           <div style={{ marginTop: 20, fontSize: "1rem", textAlign: "center" }}>
             <p>💺 Seat ID: {seatData.seatId ?? "-"}</p>
-            <p>⚖️ Weight: {(seatData.weight ?? 0).toFixed(1)} kg</p>
-            <p>🌡️ Temperature: {(seatData.temperature ?? 0).toFixed(1)} °C</p>
+            {/* Show threshold state instead of raw numbers */}
+            {(() => {
+              const weight = Number(seatData.weight ?? 0);
+              const temp = Number(seatData.temperature ?? 0);
+              const WEIGHT_THRESHOLD = 10; // kg
+              const TEMP_THRESHOLD = 27; // °C
+              return (
+                <>
+                  <p>⚖️ Weight: {weight > WEIGHT_THRESHOLD ? "Above threshold" : "Below threshold"}</p>
+                  <p>🌡️ Temperature: {temp > TEMP_THRESHOLD ? "Above threshold" : "Below threshold"}</p>
+                </>
+              );
+            })()}
             <p>🕒 {seatData.timestamp ? new Date(seatData.timestamp).toLocaleTimeString() : "-"}</p>
           </div>
         </>
