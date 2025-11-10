@@ -19,12 +19,10 @@ void loop() {
     uint16_t t = (Wire.read() << 8) | Wire.read();
     float temp = (t & 0x0FFF) / 16.0;
     if (t & 0x1000) temp -= 256;
-    Serial.print("Temperature: ");
-    Serial.print(temp);
-    Serial.println(" °C");
+    Serial.println(temp);  // Output just the number, e.g., "23.50"
   } else {
-    Serial.println("Error reading temperature");
+    Serial.println("Error");
   }
 
-  delay(5000);
+  delay(3000);
 }
