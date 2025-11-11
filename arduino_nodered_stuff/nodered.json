@@ -87,7 +87,7 @@
         "type": "function",
         "z": "e8c11105c9887d96",
         "name": "Simulate random input",
-        "func": "// Pick a random seat state\nconst states = [\"empty\", \"object\", \"person\"];\nconst state = states[Math.floor(Math.random() * states.length)];\n\nlet weight, temperature;\n\nswitch (state) {\n  case \"empty\":\n    weight = Math.random() * 3;\n    temperature = 22 + Math.random() * 2;\n    break;\n  case \"object\":\n    weight = 5 + Math.random() * 25;\n    temperature = 23 + Math.random() * 2;\n    break;\n  case \"person\":\n    weight = 40 + Math.random() * 40;\n    temperature = 27 + Math.random() * 5;\n    break;\n}\n\nmsg.payload = { weight, temperature };\nreturn msg;",
+        "func": "// Pick a random seat state\nconst states = [\"empty\", \"object\", \"person\"];\nconst state = states[Math.floor(Math.random() * states.length)];\n\nlet weight, temperature;\n\nswitch (state) {\n  case \"empty\":\n    weight = Math.random() * 3;\n    temperature = 22 + Math.random() * 2;\n    break;\n  case \"object\":\n    weight = 5 + Math.random() * 25;\n    temperature = 22 + Math.random() * 2;\n    break;\n  case \"person\":\n    weight = 40 + Math.random() * 40;\n    temperature = 27 + Math.random() * 5;\n    break;\n}\n\nmsg.payload = { weight, temperature };\nreturn msg;",
         "outputs": 1,
         "timeout": "",
         "noerr": 0,

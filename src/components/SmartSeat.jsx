@@ -25,14 +25,13 @@ export default function SeatStatus() {
       const computeColorAndStatus = ({ weight, temperature }) => {
         // Use Node-RED simulation ranges:
         // empty: weight ~ 0-3, temp ~22-24
-        // object: weight ~5-30, temp ~23-25
+        // object: weight ~5-30, temp ~22-25
         // person: weight ~40-80, temp ~27-32
         let state = "unknown";
         if (weight <= 3) state = "empty";
         else if (weight >= 25) state = "person";
         else if (weight >= 5) state = "object";
 
-        // temperature can strengthen a person hypothesis
         if (temperature >= 27 && weight > 10) state = "person";
 
         switch (state) {
@@ -79,7 +78,7 @@ export default function SeatStatus() {
         backgroundColor: "#f4f4f4",
       }}
     >
-      <h1>🚆 Train Seat Occupancy</h1>
+      <h1>Train Seat Occupancy</h1>
 
       <button
         onClick={fetchSeatData}
@@ -130,12 +129,12 @@ export default function SeatStatus() {
               const TEMP_THRESHOLD = 27; // °C
               return (
                 <>
-                  <p>⚖️ Weight: {weight > WEIGHT_THRESHOLD ? "Above threshold" : "Below threshold"}</p>
-                  <p>🌡️ Temperature: {temp > TEMP_THRESHOLD ? "Above threshold" : "Below threshold"}</p>
+                  <p>Weight: {weight > WEIGHT_THRESHOLD ? "Above threshold" : "Below threshold"}</p>
+                  <p>Temperature: {temp > TEMP_THRESHOLD ? "Above threshold" : "Below threshold"}</p>
                 </>
               );
             })()}
-            <p>🕒 {seatData.timestamp ? new Date(seatData.timestamp).toLocaleTimeString() : "-"}</p>
+            <p>Time: {seatData.timestamp ? new Date(seatData.timestamp).toLocaleTimeString() : "-"}</p>
           </div>
         </>
       )}
