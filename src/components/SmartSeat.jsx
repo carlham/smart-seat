@@ -140,7 +140,7 @@ export default function SeatStatus() {
             <p>💺 Seat ID: {seatData.seatId}</p>
             <p>Weight: {seatData.weight}</p>
             <p>Temperature: {seatData.temperature}</p>
-            <p>Weight and temp just here for testing purposes, <br/>will not be visible on final product</p>
+            <p>Weight and temp just here for testing purposes, <br/> will not be visible on final product</p>
             <p style={{ fontSize: "0.9rem", color: "#666", marginTop: 10 }}>
               Updated: {new Date(seatData.timestamp).toLocaleTimeString()}
             </p>
