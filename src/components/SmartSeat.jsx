@@ -1,70 +1,96 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function SeatStatus() {
   const [seatData, setSeatData] = useState(null);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [connecting, setConnecting] = useState(true);
+  const ws = useRef(null); // Keep WebSocket instance
 
-  const fetchSeatData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("http://localhost:1880/api/seat");
-      if (!res.ok) throw new Error("Network response was not ok");
-      const data = await res.json();
-
-      // Node-RED may return msg.payload = { weight, temperature }
-      // or the API may return a full object. Normalize payload here.
-      const payload = data.payload ?? data;
-
-      // Ensure numeric values
-      const weight = Number(payload.weight ?? 0);
-      const temperature = Number(payload.temperature ?? 0);
-
-      // Derive a friendly status and color from the simulation rules
-      const computeColorAndStatus = ({ weight, temperature }) => {
-        // Use Node-RED simulation ranges:
-        // empty: weight ~ 0-3, temp ~22-24
-        // object: weight ~5-30, temp ~22-25
-        // person: weight ~40-80, temp ~27-32
-        let state = "unknown";
-        if (weight <= 3) state = "empty";
-        else if (weight >= 25) state = "person";
-        else if (weight >= 5) state = "object";
-
-        if (temperature >= 27 && weight > 10) state = "person";
-
-        switch (state) {
-          case "empty":
-            return { color: "#5cb85c", status: "Empty" };
-          case "object":
-            return { color: "#337ab7", status: "Object detected" };
-          case "person":
-            return { color: "#d9534f", status: "Person detected" };
-          default:
-            return { color: "#777", status: "Unknown" };
-        }
-      };
-
-      const { color, status } = computeColorAndStatus({ weight, temperature });
-
-      const seatId = data.seatId ?? payload.seatId ?? "-";
-      const timestamp = data.timestamp ?? payload.timestamp ?? new Date().toISOString();
-
-      setSeatData({ ...payload, weight, temperature, color, status, seatId, timestamp });
-      console.log("Fetched seat data:", payload);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  // Helper to compute color/status (same logic as before)
+  const computeColorAndStatus = ({ weight, temperature }) => {
+    // 1. Empty is easy and almost never wrong
+    if (weight <= 4) {
+      return { color: "#5cb85c", status: "Empty", reason: "No weight" };
     }
+
+    // 2. Strong person signal — high weight + clearly elevated temperature
+    if (weight > 10 && temperature >= 23.51) {
+      return { color: "#d9534f", status: "Person detected", reason: "Weight + body heat" };
+    }
+
+    // 3. Strong object signal — decent weight but temperature still ambient
+    if (weight >= 5 && temperature <= 23.5) {
+      return { color: "#337ab7", status: "Object detected", reason: "Weight, no heat" };
+    }
+
+    // 4. Everything else = uncertain
+    return { 
+      color: "#f0ad4e", 
+      status: "Uncertain", 
+      reason: `Weight ${weight.toFixed(1)} kg, Temp ${temperature.toFixed(1)} °C` 
+    };
   };
 
-  // Fetch initial state once on mount so user doesn't have to click
   useEffect(() => {
-    fetchSeatData();
-  }, []);
+    // Create WebSocket connection
+    const socket = new WebSocket("ws://localhost:1880/ws/seat");
 
+    socket.onopen = () => {
+      console.log("WebSocket connected");
+      setConnecting(false);
+      setError(null);
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        // Node-RED sends the full seat object directly
+        const data = JSON.parse(event.data);
+
+        const weight = Number(data.weight ?? 0);
+        const temperature = Number(data.temperature ?? 0);
+        const { color, status } = computeColorAndStatus({ weight, temperature });
+
+        setSeatData({
+          ...data,
+          weight,
+          temperature,
+          color,
+          status,
+          seatId: data.seatId ?? "-",
+          timestamp: data.timestamp ?? new Date().toISOString(),
+        });
+        console.log(data)
+      } catch (err) {
+        console.error("Failed to parse WebSocket message", err);
+      }
+    };
+
+    socket.onerror = (err) => {
+      console.error("WebSocket error", err);
+      setError("WebSocket connection error");
+      setConnecting(false);
+    };
+
+    socket.onclose = () => {
+      console.log("WebSocket closed – reconnecting in 3s...");
+      setError("Connection lost – reconnecting...");
+      setConnecting(true);
+
+      // Auto-reconnect after 3 seconds
+      setTimeout(() => {
+        ws.current = null;
+        // useEffect will run again and reconnect
+        setSeatData(null);
+      }, 3000);
+    };
+
+    ws.current = socket;
+
+    // Cleanup on unmount
+    return () => {
+      socket.close();
+    };
+  }, []); // Run only once on mount
 
   return (
     <div
@@ -78,26 +104,15 @@ export default function SeatStatus() {
         backgroundColor: "#f4f4f4",
       }}
     >
-      <h1>Train Seat Occupancy</h1>
+      <h1>Train Seat Occupancy (Live)</h1>
 
-      <button
-        onClick={fetchSeatData}
-        style={{
-          padding: "10px 20px",
-          fontSize: "1rem",
-          borderRadius: 8,
-          border: "none",
-          cursor: "pointer",
-          marginBottom: 20,
-          backgroundColor: "#333",
-          color: "white",
-        }}
-        disabled={loading}
-      >
-        {loading ? "Fetching..." : "Check Seat"}
-      </button>
+      {connecting && (
+        <p style={{ color: "#999" }}>Connecting to live updates...</p>
+      )}
 
-      {error && <div style={{ color: "red", marginBottom: 20 }}>Error: {error}</div>}
+      {error && (
+        <div style={{ color: "red", marginBottom: 20 }}>⚠️ {error}</div>
+      )}
 
       {seatData && (
         <>
@@ -111,32 +126,30 @@ export default function SeatStatus() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "1.2rem",
+              fontSize: "1.4rem",
               fontWeight: "bold",
+              color: "white",
+              textShadow: "1px 1px 3px rgba(0,0,0,0.5)",
               transition: "background-color 0.5s ease",
             }}
           >
-            {seatData.status ?? "—"}
+            {seatData.status}
           </div>
 
-          <div style={{ marginTop: 20, fontSize: "1rem", textAlign: "center" }}>
-            <p>💺 Seat ID: {seatData.seatId ?? "-"}</p>
-            {/* Show threshold state instead of raw numbers */}
-            {(() => {
-              const weight = Number(seatData.weight ?? 0);
-              const temp = Number(seatData.temperature ?? 0);
-              const WEIGHT_THRESHOLD = 10; // kg
-              const TEMP_THRESHOLD = 27; // °C
-              return (
-                <>
-                  <p>Weight: {weight > WEIGHT_THRESHOLD ? "Above threshold" : "Below threshold"}</p>
-                  <p>Temperature: {temp > TEMP_THRESHOLD ? "Above threshold" : "Below threshold"}</p>
-                </>
-              );
-            })()}
-            <p>Time: {seatData.timestamp ? new Date(seatData.timestamp).toLocaleTimeString() : "-"}</p>
+          <div style={{ marginTop: 30, textAlign: "center", fontSize: "1.1rem" }}>
+            <p>💺 Seat ID: {seatData.seatId}</p>
+            <p>Weight: {seatData.weight}</p>
+            <p>Temperature: {seatData.temperature}</p>
+            <p>Weight and temp just here for testing purposes, <br/>will not be visible on final product</p>
+            <p style={{ fontSize: "0.9rem", color: "#666", marginTop: 10 }}>
+              Updated: {new Date(seatData.timestamp).toLocaleTimeString()}
+            </p>
           </div>
         </>
+      )}
+
+      {!seatData && !connecting && !error && (
+        <p>Waiting for first update...</p>
       )}
     </div>
   );

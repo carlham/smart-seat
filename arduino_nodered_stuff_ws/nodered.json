@@ -1,0 +1,183 @@
+[
+    {
+        "id": "bb3ff458505fdfde",
+        "type": "tab",
+        "label": "Clean Seat Data Feed",
+        "disabled": false,
+        "info": "Real temperature + random weight (until real sensor)"
+    },
+    {
+        "id": "e13afaed1664cf5c",
+        "type": "function",
+        "z": "bb3ff458505fdfde",
+        "name": "Store Real Temp",
+        "func": "let temp = parseFloat(msg.payload.trim());\nif (!isNaN(temp)) {\n    flow.set('realTemp', temp);\n    node.status({fill:\"green\",shape:\"dot\",text:temp.toFixed(2)+\" °C\"});\n}\nreturn null;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 80,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "9a076d8cdb03b110",
+        "type": "inject",
+        "z": "bb3ff458505fdfde",
+        "name": "Random weight every 2s",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "2",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "2",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 200,
+        "y": 200,
+        "wires": [
+            [
+                "cc24cb63b4b3627f"
+            ]
+        ]
+    },
+    {
+        "id": "cc24cb63b4b3627f",
+        "type": "function",
+        "z": "bb3ff458505fdfde",
+        "name": "Combine Real Temp + Random Weight",
+        "func": "const realTemp = flow.get('realTemp') || 23;\nconst randomWeight = Number((Math.random() * 100).toFixed(2)); // 0.00 – 99.99 kg\n\nmsg.payload = {\n    seatId: 1,\n    weight: randomWeight,\n    temperature: Number(realTemp.toFixed(2)),\n    timestamp: new Date().toISOString()\n};\n\nnode.status({text: `W: ${randomWeight} kg | T: ${realTemp.toFixed(2)} °C`});\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 520,
+        "y": 200,
+        "wires": [
+            [
+                "0c6e021bd0d3ca4a",
+                "cbf51ab88eaf4a27"
+            ]
+        ]
+    },
+    {
+        "id": "0c6e021bd0d3ca4a",
+        "type": "debug",
+        "z": "bb3ff458505fdfde",
+        "name": "Clean Raw Data",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 800,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "ebefc5ac2ce03320",
+        "type": "websocket in",
+        "z": "bb3ff458505fdfde",
+        "name": "WS Connect",
+        "server": "ws-server",
+        "client": "",
+        "x": 200,
+        "y": 320,
+        "wires": [
+            [
+                "c7c4462681b3f1a7"
+            ]
+        ]
+    },
+    {
+        "id": "c7c4462681b3f1a7",
+        "type": "trigger",
+        "z": "bb3ff458505fdfde",
+        "name": "Send current data on connect",
+        "op1": "",
+        "op1type": "nul",
+        "duration": "100",
+        "units": "ms",
+        "outputs": 1,
+        "x": 480,
+        "y": 320,
+        "wires": [
+            [
+                "cc24cb63b4b3627f"
+            ]
+        ]
+    },
+    {
+        "id": "cbf51ab88eaf4a27",
+        "type": "websocket out",
+        "z": "bb3ff458505fdfde",
+        "name": "Push to React",
+        "server": "ws-server",
+        "client": "",
+        "x": 820,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "58f2653d1b283641",
+        "type": "serial in",
+        "z": "bb3ff458505fdfde",
+        "name": "Arduino Real Temp",
+        "serial": "c2cb5a8fbbcd816e",
+        "x": 180,
+        "y": 80,
+        "wires": [
+            [
+                "e13afaed1664cf5c"
+            ]
+        ]
+    },
+    {
+        "id": "ws-server",
+        "type": "websocket-listener",
+        "path": "/ws/seat",
+        "wholemsg": "false"
+    },
+    {
+        "id": "c2cb5a8fbbcd816e",
+        "type": "serial-port",
+        "name": "",
+        "serialport": "/dev/cu.usbmodem11201",
+        "serialbaud": "9600",
+        "databits": 8,
+        "parity": "none",
+        "stopbits": 1,
+        "waitfor": "",
+        "dtr": "none",
+        "rts": "none",
+        "cts": "none",
+        "dsr": "none",
+        "newline": "\\n",
+        "bin": "false",
+        "out": "char",
+        "addchar": "",
+        "responsetimeout": 10000
+    },
+    {
+        "id": "4d2b4216c019fb06",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-node-serialport": "2.0.3"
+        }
+    }
+]
