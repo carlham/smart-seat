@@ -11,8 +11,9 @@ export default function TrainSeatMonitor() {
   // Read ThingSpeak channel/config from environment (Vite exposes VITE_* vars to the client)
   const CHANNEL_ID = import.meta.env.VITE_CHANNEL_ID;
   const API_KEY = import.meta.env.VITE_API_KEY;
-  const API_URL = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=2`
-  const TEMP_THRESHOLD = 0.5; // Temperature rise threshold in °C (adjust as needed)
+  const API_URL = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=20`; // Get last 20 readings (5 minutes)
+  const TEMP_RISE_THRESHOLD = 0.5; // Temperature rise threshold in °C
+  const ABS_TEMP_THRESHOLD = 28.0; // Absolute temperature indicating body heat (°C)
 
   const fetchData = async () => {
     try {
@@ -27,20 +28,44 @@ export default function TrainSeatMonitor() {
         const prevTemp = previous ? parseFloat(previous.field1) : null;
         const pressureDetected = parseInt(latest.field2) === 1;
         
-        // Calculate temperature change
+        // Calculate immediate temperature change
         const tempRise = prevTemp !== null ? currentTemp - prevTemp : 0;
+        
+        // Check if there was ANY significant temp rise in recent history
+        let hadRecentTempSpike = false;
+        if (data.feeds.length >= 3) {
+          for (let i = data.feeds.length - 1; i >= 1; i--) {
+            const currentReading = parseFloat(data.feeds[i].field1);
+            const previousReading = parseFloat(data.feeds[i - 1].field1);
+            const rise = currentReading - previousReading;
+            
+            if (rise >= TEMP_RISE_THRESHOLD) {
+              hadRecentTempSpike = true;
+              break;
+            }
+          }
+        }
         
         // Determine occupancy status and reason
         let occupied = false;
         let reason = '';
         
-        if (pressureDetected && tempRise >= TEMP_THRESHOLD) {
-          occupied = true;
-          reason = `Person detected (temp +${tempRise.toFixed(1)}°C)`;
-        } else if (pressureDetected && tempRise < TEMP_THRESHOLD) {
-          occupied = true;
-          reason = 'Object detected (no body heat)';
-        } else if (!pressureDetected) {
+        if (pressureDetected) {
+          // If pressure is detected, determine if it's a person or object
+          if (currentTemp >= ABS_TEMP_THRESHOLD || hadRecentTempSpike) {
+            occupied = true;
+            if (tempRise >= TEMP_RISE_THRESHOLD) {
+              reason = `Person detected (temp +${tempRise.toFixed(1)}°C)`;
+            } else if (hadRecentTempSpike) {
+              reason = `Person detected (body heat at ${currentTemp.toFixed(1)}°C)`;
+            } else {
+              reason = `Person detected (warm: ${currentTemp.toFixed(1)}°C)`;
+            }
+          } else {
+            occupied = true;
+            reason = `Object detected (cool: ${currentTemp.toFixed(1)}°C, no body heat)`;
+          }
+        } else {
           occupied = false;
           reason = 'Seat available';
         }
@@ -65,7 +90,7 @@ export default function TrainSeatMonitor() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000); // Poll every 15 seconds
+    const interval = setInterval(fetchData, 5000); // Poll every 5 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -153,8 +178,8 @@ export default function TrainSeatMonitor() {
           <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4 mb-6">
             <h3 className="font-semibold text-purple-900 mb-2">Detection Logic:</h3>
             <ul className="text-sm text-purple-800 space-y-1">
-              <li><strong>Person:</strong> Pressure + Temperature rise ≥ {TEMP_THRESHOLD}°C</li>
-              <li><strong>Object:</strong> Pressure + Temperature unchanged</li>
+              <li><strong>Person:</strong> Pressure + (Temp ≥{ABS_TEMP_THRESHOLD}°C OR recent spike ≥{TEMP_RISE_THRESHOLD}°C)</li>
+              <li><strong>Object:</strong> Pressure + Cool temperature (no body heat)</li>
               <li><strong>Available:</strong> No pressure detected</li>
             </ul>
           </div>
@@ -174,7 +199,7 @@ export default function TrainSeatMonitor() {
           {/* Info */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <p className="text-sm text-gray-600 text-center">
-              Updates automatically every 15 seconds • Powered by ESP32 & ThingSpeak
+              Updates automatically every 5 seconds • Powered by ESP32 & ThingSpeak
             </p>
           </div>
         </div>
